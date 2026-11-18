@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Active Directory e IIS: guía práctica</title>
+<style>
+:root{
+  --paper:#e9eef2; --panel:#ffffff; --ink:#12222e; --muted:#4a5b68;
+  --teal:#1c6b73; --led:#e8a317; --line:#c5d0d8; --term:#0e2230;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:"Segoe UI",system-ui,-apple-system,Arial,sans-serif;
+  background:var(--paper); color:var(--ink); line-height:1.6;
+  min-height:100vh; display:flex; flex-direction:column;
+}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif; line-height:1.2}
+code,pre{font-family:Consolas,"Cascadia Mono","Courier New",monospace}
+a{color:var(--teal)}
+
+/* Controles ocultos del menú (sin JavaScript) */
+.ctl{position:absolute;opacity:0;pointer-events:none}
+
+/* Estructura */
+.shell{display:grid;grid-template-columns:16rem 1fr;flex:1;max-width:72rem;width:100%;margin:0 auto}
+nav{
+  padding:2rem 1.25rem; border-right:1px solid var(--line);
+  position:sticky; top:0; align-self:start; height:100vh;
+}
+.brand{font-family:Georgia,serif;font-weight:700;font-size:1.15rem;margin-bottom:1.5rem;display:flex;align-items:center;gap:.6rem}
+.brand i{width:.7rem;height:.7rem;border-radius:50%;background:var(--led);box-shadow:0 0 0 3px rgba(232,163,23,.25)}
+.menu{display:flex;flex-direction:column;gap:.35rem}
+.menu label{
+  display:block;padding:.65rem .9rem;border-radius:.4rem;cursor:pointer;
+  border-left:4px solid transparent;color:var(--muted);font-weight:600;
+  transition:background .15s,color .15s,border-color .15s;
+}
+.menu label:hover{background:rgba(28,107,115,.08);color:var(--ink)}
+.burger{display:none}
+
+/* Selección de sección */
+#t1:checked ~ .shell label[for=t1],
+#t2:checked ~ .shell label[for=t2],
+#t3:checked ~ .shell label[for=t3]{
+  background:var(--panel);color:var(--ink);border-left-color:var(--led);
+}
+#t1:focus-visible ~ .shell label[for=t1],
+#t2:focus-visible ~ .shell label[for=t2],
+#t3:focus-visible ~ .shell label[for=t3],
+#burger:focus-visible ~ .shell .burger{outline:3px solid var(--teal);outline-offset:2px}
+
+main{padding:2.5rem 2.5rem 3rem}
+.panel{display:none;max-width:44rem}
+#t1:checked ~ .shell #p1,
+#t2:checked ~ .shell #p2,
+#t3:checked ~ .shell #p3{display:block}
+
+/* Contenido */
+h1{font-size:2.4rem;margin-bottom:1rem}
+h2{font-size:1.7rem;margin-bottom:1rem}
+h3{font-size:1.15rem;margin-bottom:.35rem}
+.lead{font-size:1.1rem;color:var(--muted);margin-bottom:1.75rem}
+p+p{margin-top:.8rem}
+
+.term{background:var(--term);color:#d9e8ef;border-radius:.5rem;overflow:hidden;margin:1.5rem 0}
+.term .bar{display:flex;gap:.4rem;padding:.55rem .8rem;background:#0a1923}
+.term .bar span{width:.6rem;height:.6rem;border-radius:50%;background:#35566a}
+.term .bar span:first-child{background:var(--led)}
+.term pre{padding:1rem 1.1rem;overflow-x:auto;font-size:.92rem;line-height:1.7}
+.term .c{color:#7fb3bf}
+
+.facts{display:grid;gap:1rem}
+.fact{background:var(--panel);border-left:4px solid var(--teal);padding:1rem 1.2rem;border-radius:0 .4rem .4rem 0}
+.fact p{color:var(--muted)}
+.fact code{background:var(--paper);padding:.05rem .35rem;border-radius:.25rem;font-size:.9em;color:var(--ink)}
+
+details{background:var(--panel);border:1px solid var(--line);border-radius:.5rem;margin-bottom:.8rem}
+summary{cursor:pointer;padding:.95rem 1.2rem;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:1rem}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"+";color:var(--teal);font-size:1.3rem;line-height:1}
+details[open] summary::after{content:"\2212"}
+summary:focus-visible{outline:3px solid var(--teal);outline-offset:-3px;border-radius:.5rem}
+details[open]{border-color:var(--teal)}
+details .sol{padding:0 1.2rem 1.1rem;color:var(--muted)}
+details .sol strong{color:var(--ink)}
+details code{background:var(--paper);padding:.05rem .35rem;border-radius:.25rem;font-size:.9em;color:var(--ink)}
+
+/* Pie de página */
+footer{background:var(--term);color:#d9e8ef;padding:2rem 1.5rem}
+.foot{max-width:72rem;margin:0 auto;display:flex;flex-wrap:wrap;justify-content:space-between;gap:1.5rem}
+footer h3{color:#fff;margin-bottom:.5rem}
+footer p{color:#a9c0cc;font-size:.95rem}
+footer a{color:var(--led)}
+footer a:focus-visible{outline:3px solid var(--led);outline-offset:2px}
+
+/* Móvil */
+@media (max-width:760px){
+  .shell{grid-template-columns:1fr}
+  nav{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:1rem 1.25rem}
+  .brand{margin-bottom:0;justify-content:space-between}
+  .burger{display:inline-block;cursor:pointer;font-weight:600;color:var(--teal);padding:.3rem .6rem;border:1px solid var(--teal);border-radius:.4rem}
+  .menu{display:none;margin-top:1rem}
+  #burger:checked ~ .shell .menu{display:flex}
+  main{padding:1.75rem 1.25rem 2.5rem}
+  h1{font-size:1.9rem}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+
+<input class="ctl" type="checkbox" id="burger" aria-label="Abrir menú">
+<input class="ctl" type="radio" name="s" id="t1" checked>
+<input class="ctl" type="radio" name="s" id="t2">
+<input class="ctl" type="radio" name="s" id="t3">
+
+<div class="shell">
+  <nav aria-label="Menú principal">
+    <div class="brand"><span style="display:flex;align-items:center;gap:.6rem"><i></i>Guía AD e IIS</span>
+      <label class="burger" for="burger">Menú</label>
+    </div>
+    <div class="menu">
+      <label for="t1">Inicio</label>
+      <label for="t2">Información básica</label>
+      <label for="t3">Problemas y soluciones</label>
+    </div>
+  </nav>
+
+  <main>
+    <!-- INICIO -->
+    <section class="panel" id="p1">
+      <h1>Administra usuarios y publica sitios en Windows Server</h1>
+      <p class="lead">Una guía corta para quien trabaja por primera vez con Active Directory, IIS y escritorio remoto en un servidor compartido.</p>
+      <p>Aquí encuentras qué hace cada servicio, cómo se conectan entre sí y qué hacer cuando algo falla. Usa el menú para moverte entre secciones.</p>
+      <div class="term" role="img" aria-label="Ejemplo de comandos en consola">
+        <div class="bar"><span></span><span></span><span></span></div>
+<pre><span class="c">:: Entrar a tu carpeta y clonar el repositorio</span>
+C:\&gt; cd C:\inetpub\wwwroot\grupo\Noe_Ramirez
+C:\&gt; git clone https://github.com/usuario/mi-sitio .
+
+<span class="c">:: Comprobar el sitio en el navegador</span>
+C:\&gt; start http://localhost/grupo/Noe_Ramirez/</pre>
+      </div>
+    </section>
+
+    <!-- INFORMACIÓN BÁSICA -->
+    <section class="panel" id="p2">
+      <h2>Información básica</h2>
+      <p class="lead">Cuatro piezas que debes entender para trabajar en el servidor.</p>
+      <div class="facts">
+        <div class="fact">
+          <h3>Active Directory (AD)</h3>
+          <p>Es el directorio central donde viven los usuarios, grupos y equipos de una organización. Con él, una sola cuenta sirve para entrar a varios recursos y el administrador controla los permisos desde un solo lugar.</p>
+        </div>
+        <div class="fact">
+          <h3>Unidades organizativas y grupos</h3>
+          <p>Una unidad organizativa (UO) es un contenedor que ordena objetos, por ejemplo uno por cada grupo de trabajo. Dentro de ella, un grupo permite dar los mismos permisos a todos sus miembros a la vez.</p>
+        </div>
+        <div class="fact">
+          <h3>IIS</h3>
+          <p>Internet Information Services es el servidor web de Windows. Publica las carpetas del sitio, normalmente desde <code>C:\inetpub\wwwroot</code>, y las muestra en <code>http://localhost/</code>.</p>
+        </div>
+        <div class="fact">
+          <h3>Escritorio remoto (RDP)</h3>
+          <p>Protocolo que permite usar el servidor como si estuvieras frente a él. Escucha en el puerto <code>3389</code> y se abre con <code>mstsc</code>, usando tu usuario y contraseña de AD.</p>
+        </div>
+        <div class="fact">
+          <h3>Git y GitHub</h3>
+          <p>Git guarda el historial de tu sitio. Subes el proyecto a GitHub y, desde el servidor, lo descargas con <code>git clone</code> dentro de tu carpeta.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROBLEMAS Y SOLUCIONES -->
+    <section class="panel" id="p3">
+      <h2>Problemas y soluciones</h2>
+      <p class="lead">Abre cada pregunta para ver cómo resolverla.</p>
+
+      <details>
+        <summary>No puedo conectarme por escritorio remoto</summary>
+        <div class="sol">
+          <p><strong>Solución:</strong> verifica que la IP y el puerto 3389 sean correctos y que escribas el usuario completo, con el formato <code>DOMINIO\usuario</code>. Confirma que tu cuenta existe y que pertenece al grupo de tu unidad organizativa. Si el error persiste, pide a tu líder que pruebe la cuenta de nuevo.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>La contraseña de mi cuenta nueva es rechazada</summary>
+        <div class="sol">
+          <p><strong>Solución:</strong> AD exige una contraseña compleja: mínimo 8 caracteres con mayúsculas, minúsculas, números y símbolos. Si la cuenta se creó con la opción "El usuario debe cambiar la contraseña al iniciar sesión", define una nueva cuando el sistema la pida.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>El navegador muestra error 404 o una lista de archivos</summary>
+        <div class="sol">
+          <p><strong>Solución:</strong> el archivo <code>index.html</code> debe estar directamente en tu carpeta. Si <code>git clone</code> creó una subcarpeta con el nombre del repositorio, mueve el contenido a tu carpeta o agrega esa subcarpeta a la dirección.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>git clone falla</summary>
+        <div class="sol">
+          <p><strong>Solución:</strong> revisa que la URL esté completa y que el repositorio sea público. Si es privado, el servidor pedirá tus credenciales de GitHub. Asegúrate también de ejecutar el comando dentro de tu carpeta y no en la de otro grupo.</p>
+        </div>
+      </details>
+
+      <details>
+        <summary>Cambié el sitio y no veo los cambios</summary>
+        <div class="sol">
+          <p><strong>Solución:</strong> el navegador guarda una copia en caché. Recarga con <code>Ctrl + F5</code>. Si editaste el archivo en GitHub, ejecuta <code>git pull</code> en la carpeta del servidor.</p>
+        </div>
+      </details>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="foot">
+    <div>
+      <h3>Contacto</h3>
+      <p>Noé Naun Ramírez Romero<br>Ingeniería en Desarrollo de Software, Universidad de Oriente (UNIVO)</p>
+    </div>
+    <div>
+      <h3>Escríbeme</h3>
+      <p>Correo: <a href="mailto:noenaum456@gmail.com">noenaum456@gmail.com</a><br>
+      GitHub: <a href="https://github.com/noenaum456-lgtm/Ejercicios.git">github.com/noenaum456</a></p>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
